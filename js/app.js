@@ -138,7 +138,7 @@ function pageDashboard(){
   const r=compute(state), e=evaluate(state,r), c=state.counts;
   const totalAnimals=c.ewes+c.rams+c.hens+c.does+c.bucks;
   return `
-  ${hero('مرحباً بك في مزرعتك','الأغنام الدمانية × الصردي · دجاج بيّاض · أرانب — كل أرقامك في مكان واحد.','🐑 🐔 🐇  مشروع متكامل','assets/photos/sheep-barn-outdoor.jpg')}
+  ${hero('مرحباً بك في SADKI ECURIE','الأغنام الدمانية × الصردي · دجاج بيّاض · أرانب — كل أرقامك في مكان واحد.','🐑 🐔 🐇  مشروع متكامل','assets/photos/sheep-barn-outdoor.jpg')}
   <div class="grid g4" style="margin-bottom:18px">
     <div class="stat green"><div class="lab">إجمالي الرؤوس</div><div class="val">${fmt(totalAnimals)}</div><div class="sub">${fmt(c.ewes)} نعجة · ${fmt(c.hens)} دجاجة · ${fmt(c.does+c.bucks)} أرنب</div></div>
     <div class="stat blue"><div class="lab">الاستثمار الإجمالي</div><div class="val money">${fmt(Math.round(r.invest))}</div><div class="sub">درهم مغربي (تقديري)</div></div>

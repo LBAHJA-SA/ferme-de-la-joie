@@ -590,7 +590,7 @@ document.addEventListener('click',e=>{
     const rows=[head,...state.logs.map(l=>[l.date,sp[l.species]||l.species,l.animal||'',l.event,Number(l.cost||0),Number(l.revenue||0),l.notes||''])];
     if(rows.length===1) rows.push(['—','لا توجد أحداث مسجلة بعد','','','','','']);
     const url=URL.createObjectURL(makeXlsx(rows));
-    const link=document.createElement('a'); link.href=url; link.download='mazraat-albahja-suivi.xlsx';
+    const link=document.createElement('a'); link.href=url; link.download='ferme-de-la-joie-suivi.xlsx';
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }

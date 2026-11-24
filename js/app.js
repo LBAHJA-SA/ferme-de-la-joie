@@ -20,7 +20,11 @@ function load(){
       counts:{...DEFAULTS.counts,...(s.counts||{})},
       prices:{...DEFAULTS.prices,...(s.prices||{})},
       infra:{...DEFAULTS.infra,...(s.infra||{})},
-      settings:{...DEFAULTS.settings,...(s.settings||{})}}; }
+      settings:{...DEFAULTS.settings,...(s.settings||{})},
+      feed:{...DEFAULTS.feed,...(s.feed||{})},
+      health:{...DEFAULTS.health,...(s.health||{})},
+      breeding:{...DEFAULTS.breeding,...(s.breeding||{})},
+      eggs:s.eggs||[], routineDone:s.routineDone||{}}; }
   }catch(e){ console.warn('load failed',e); }
   return clone(DEFAULTS);
 }
@@ -255,6 +259,7 @@ function pageChickens(){
       ${HEN_HEALTH.map(h=>`<tr><td><b>${h[0]}</b></td><td>${h[1]}</td></tr>`).join('')}
     </tbody></table></div>
   </div>
+  ${eggCard()}
   ${gallery('الدجاج الفرنسي — مراجعك',[
     ['assets/photos/chickens-french.jpg','تربية الدجاج الفرنسي في قطيع صغير'],
     ['assets/photos/chickens-close.jpg','ديك فرنسي وإناث قريبة منه']
@@ -491,6 +496,305 @@ function pagePlan(){
   ])}`;
 }
 
+/* ---------- أدوات التواريخ ---------- */
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const dnum=s=>{const d=new Date(String(s||'')+'T00:00:00');return isNaN(d)?null:d;};
+const addDays=(s,n)=>{const d=dnum(s);if(!d)return '';d.setDate(d.getDate()+Number(n));return iso(d);};
+const dayDiff=(a,b)=>{const x=dnum(a),y=dnum(b);if(!x||!y)return null;return Math.round((y-x)/86400000);};
+const ageDays=s=>dayDiff(s,today());
+const duePill=days=> days===null?'<span class="pill v">—</span>'
+  : days<0?`<span class="pill r">متأخر ${Math.abs(days)} ي</span>`
+  : days===0?'<span class="pill a">اليوم</span>'
+  : days<=7?`<span class="pill a">${days} ي</span>`
+  : `<span class="pill g">${days} ي</span>`;
+
+/* ---------- التذكيرات التلقائية ---------- */
+function reminders(){
+  const out=[];
+  (state.health.plans||[]).forEach(p=>{ if(p.due){ const days=dayDiff(today(),p.due); if(days!==null&&days<=30) out.push({date:p.due,label:p.name,kind:'وقاية',days,ico:'💉'}); }});
+  (state.health.treatments||[]).forEach(t=>{ if(Number(t.withdrawalDays)>0){ const end=addDays(t.date,t.withdrawalDays); const days=dayDiff(today(),end); if(days!==null&&days<=14) out.push({date:end,label:`انتهاء سحب ${t.drug} — ${t.animal}`,kind:'سحب دواء',days,ico:'⏳'}); }});
+  (state.breeding.ewes||[]).forEach(e=>{ if(e.matingDate&&!e.lambDate){ const exp=addDays(e.matingDate,150); const days=dayDiff(today(),exp); if(days!==null&&days<=45) out.push({date:exp,label:`ولادة متوقعة — النعجة ${e.num}`,kind:'ولادة',days,ico:'🐑'}); }});
+  (state.breeding.lambs||[]).forEach(l=>{ if(l.birthDate&&!l.saleDate){ const d=ageDays(l.birthDate); if(d!==null&&d>=80&&d<=120) out.push({date:today(),label:`الخروف ${l.id} عمره ${d} ي — قرب الفطام`,kind:'فطام',days:0,ico:'🐣'}); }});
+  return out.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+}
+function reminderCard(){
+  const list=reminders();
+  return `<div class="card"><h3><span class="hico">🔔</span> تنبيهات تلقائية</h3>
+    ${list.length?`<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>التنبيه</th><th>النوع</th><th>متبقي</th></tr></thead><tbody>
+      ${list.map(x=>`<tr><td class="money">${esc(x.date)}</td><td>${x.ico} ${esc(x.label)}</td><td>${x.kind}</td><td>${duePill(x.days)}</td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="empty">لا توجد تواريخ قريبة — أضف موعد تلقيح أو علاج أو حدّد موعد وقاية.</div>'}
+  </div>`;
+}
+
+/* ---------- سجل البيض اليومي ---------- */
+function eggCard(){
+  const last=[...state.eggs].reverse().slice(0,12);
+  const avg=last.length? Math.round(last.reduce((a,e)=>a+Number(e.count||0),0)/last.length) : compute(state).eggsDay;
+  const week=last.slice(0,7).reduce((a,e)=>a+Number(e.count||0),0);
+  const max=Math.max(...last.map(e=>Number(e.count||0)),1);
+  return `<div class="card"><h3><span class="hico">🥚</span> سجل البيض اليومي</h3>
+    <form data-form="egg" class="row">
+      <label class="fld">التاريخ<input class="inp" name="date" type="date" value="${today()}" required></label>
+      <label class="fld">عدد البيض<input class="inp" name="count" type="number" min="0" required></label>
+      <label class="fld">مكسور<input class="inp" name="broken" type="number" min="0" value="0"></label>
+      <label class="fld">ملاحظة<input class="inp" name="notes" placeholder="اختياري"></label>
+      <button class="btn" type="submit">＋ تسجيل</button>
+    </form>
+    <div class="grid g3" style="margin:16px 0">
+      <div class="stat amber"><div class="lab">المعدل/يوم</div><div class="val">${fmt(avg)}</div><div class="sub">آخر ${last.length||0} يوم</div></div>
+      <div class="stat green"><div class="lab">آخر 7 أيام</div><div class="val">${fmt(week)}</div><div class="sub">بيضة</div></div>
+      <div class="stat blue"><div class="lab">نسبة الإنتاج</div><div class="val">${fmt(Math.min(100,Math.round(avg/Math.max(1,state.counts.hens)*100)))}%</div><div class="sub">من ${fmt(state.counts.hens)} دجاجة</div></div>
+    </div>
+    ${last.length?`<div class="card tight" style="box-shadow:none;background:#fcfdf9">${last.map(e=>bar(e.date,Number(e.count||0),max,'#d08a25')).join('')}</div>
+    <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>البيض</th><th>مكسور</th><th>ملاحظة</th><th></th></tr></thead><tbody>
+      ${last.map(e=>`<tr><td class="money">${esc(e.date)}</td><td><b>${fmt(e.count)}</b></td><td>${fmt(e.broken)}</td><td>${esc(e.notes||'—')}</td><td><button class="btn sm danger" data-act="del-egg" data-id="${e.id}">✕</button></td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="empty">سجّل أول يوم بيض لتظهر لك النسب والرسم البياني.</div>'}
+  </div>`;
+}
+
+/* ---------- صفحة التغذية والعلف ---------- */
+function pageFeed(){
+  const r=compute(state), f=state.feed;
+  const stockKg=f.stocks.reduce((a,s)=>a+Number(s.qty||0),0);
+  const stockVal=f.stocks.reduce((a,s)=>a+Number(s.qty||0)*Number(s.price||0),0);
+  const dSheep=(r.roughageKg+r.concentrateKg)/365, dHen=r.henFeedKg/365, dRabbit=r.rabbitFeedKg/365;
+  const dTotal=dSheep+dHen+dRabbit;
+  const cover=dTotal>0?stockKg/dTotal:0;
+  const recent=[...f.logs].reverse().slice(0,12);
+  const week=f.logs.filter(l=>dayDiff(l.date,today())!==null&&dayDiff(l.date,today())<=7).reduce((a,l)=>a+Number(l.cost||0),0);
+  return `
+  ${hero('التغذية والعلف','المخزون، أوقات الوجبات، الاستهلاك اليومي، والتكلفة — كل كيس علف تحت حسابك.','🌾 أخطر بند في الميزانية','assets/photos/sheep-barn.jpg')}
+  <div class="grid g4" style="margin-bottom:18px">
+    <div class="stat green"><div class="lab">مخزون العلف</div><div class="val money">${fmt(Math.round(stockKg))} كغ</div><div class="sub">سجّل الكميات لتعرف ما تبقّى</div></div>
+    <div class="stat amber"><div class="lab">قيمة المخزون</div><div class="val money">${fmt(Math.round(stockVal))}</div><div class="sub">درهم مغربي</div></div>
+    <div class="stat blue"><div class="lab">الاستهلاك اليومي</div><div class="val money">${fmt(dTotal.toFixed(1))} كغ</div><div class="sub">غنم ${fmt(dSheep.toFixed(1))} · دجاج ${fmt(dHen.toFixed(1))} · أرانب ${fmt(dRabbit.toFixed(1))}</div></div>
+    <div class="${cover>15?'stat green':'stat rose'}"><div class="lab">المخزون يكفيك</div><div class="val">${fmt(Math.round(cover))} يوم</div><div class="sub">${cover>15?'وضع آمن':'اشترِ علفاً قريباً'}</div></div>
+  </div>
+  <div class="card">
+    <h3><span class="hico">📦</span> مخزون الأعلاف</h3>
+    <div class="table-wrap"><table><thead><tr><th>نوع العلف</th><th>السعر/كغ</th><th>الكمية (كغ)</th><th>القيمة</th><th></th></tr></thead><tbody>
+      ${f.stocks.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="money">${fmt(s.price,2)}</td><td class="money">${fmt(s.qty)}</td><td class="money">${fmt(Math.round(s.qty*s.price))}</td><td><button class="btn sm danger" data-act="del-feed" data-id="${s.id}">✕</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <form data-form="feed" class="row" style="margin-top:14px">
+      <label class="fld">نوع علف جديد<input class="inp" name="name" placeholder="مثلاً: ذرة مطحونة" required></label>
+      <label class="fld">السعر/كغ<input class="inp" name="price" type="number" min="0" step="any" required></label>
+      <label class="fld">الكمية (كغ)<input class="inp" name="qty" type="number" min="0" step="any" value="0"></label>
+      <button class="btn" type="submit">＋ إضافة</button>
+    </form>
+  </div>
+  <div class="grid g2">
+    <div class="card">
+      <h3><span class="hico">🍽️</span> تسجيل وجبة / استهلاك</h3>
+      <form data-form="feedlog">
+        <div class="row">
+          <label class="fld">التاريخ<input class="inp" name="date" type="date" value="${today()}" required></label>
+          <label class="fld">الوقت<input class="inp" name="time" type="time" value="08:00"></label>
+          <label class="fld">الصنف<select class="inp" name="species"><option value="sheep">أغنام</option><option value="chickens">دجاج</option><option value="rabbits">أرانب</option><option value="all">عام</option></select></label>
+        </div>
+        <div class="row">
+          <label class="fld">نوع العلف<select class="inp" name="feedId" required>${f.stocks.map(s=>`<option value="${s.id}">${esc(s.name)} — ${fmt(s.qty)} كغ</option>`).join('')}</select></label>
+          <label class="fld">الكمية (كغ)<input class="inp" name="qty" type="number" min="0" step="any" required></label>
+          <label class="fld">ملاحظة<input class="inp" name="notes" placeholder="اختياري"></label>
+        </div>
+        <button class="btn" type="submit" style="margin-top:6px">💾 تسجيل وخصم من المخزون</button>
+      </form>
+      <div class="note">التكلفة تُحسب تلقائياً (الكمية × سعر النوع) وتُخصم من المخزون.</div>
+    </div>
+    <div class="card">
+      <h3><span class="hico">🧮</span> احتياجاتك المحسوبة</h3>
+      ${kv('علف غنم/يوم',fmt(dSheep.toFixed(1))+' كغ')}
+      ${kv('علف دجاج/يوم',fmt(dHen.toFixed(1))+' كغ')}
+      ${kv('علف أرانب/يوم',fmt(dRabbit.toFixed(1))+' كغ')}
+      ${kv('الإجمالي/يوم',fmt(dTotal.toFixed(1))+' كغ')}
+      ${kv('الإجمالي/شهر',fmt(Math.round(dTotal*30))+' كغ')}
+      ${kv('تكلفة الأعلاف/سنة',fmt(Math.round(r.sheepFeedCost+r.henFeedCost+r.rabbitFeedCost))+' د.م')}
+      ${kv('مصروف علف آخر 7 أيام',fmt(Math.round(week))+' د.م')}
+      ${bar('استهلاك الغنم',dSheep,dTotal,'#3f8a55')}${bar('استهلاك الدجاج',dHen,dTotal,'#d08a25')}${bar('استهلاك الأرانب',dRabbit,dTotal,'#5a7fc0')}
+    </div>
+  </div>
+  <div class="card">
+    <h3><span class="hico">⏰</span> أوقات الوجبات</h3>
+    <div class="table-wrap"><table><thead><tr><th>الوقت</th><th>الصنف</th><th>المهمة</th><th>الكمية</th><th></th></tr></thead><tbody>
+      ${f.schedule.map(s=>`<tr><td class="money"><b>${esc(s.time)}</b></td><td>${({sheep:'🐑 أغنام',chickens:'🐔 دجاج',rabbits:'🐇 أرانب',all:'⚙️ عام'})[s.species]||s.species}</td><td>${esc(s.task)}</td><td>${esc(s.qty||'—')}</td><td><button class="btn sm danger" data-act="del-feedplan" data-id="${s.id}">✕</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <form data-form="feedplan" class="row" style="margin-top:14px">
+      <label class="fld">الوقت<input class="inp" name="time" type="time" value="08:00" required></label>
+      <label class="fld">الصنف<select class="inp" name="species"><option value="sheep">أغنام</option><option value="chickens">دجاج</option><option value="rabbits">أرانب</option><option value="all">عام</option></select></label>
+      <label class="fld">المهمة<input class="inp" name="task" placeholder="مثلاً: توزيع مركّز" required></label>
+      <label class="fld">الكمية<input class="inp" name="qty" placeholder="مثلاً: 5 كغ"></label>
+      <button class="btn" type="submit">＋ إضافة</button>
+    </form>
+  </div>
+  ${recent.length?`<div class="card"><h3><span class="hico">📒</span> آخر عمليات التغذية</h3><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الوقت</th><th>الصنف</th><th>العلف</th><th>الكمية</th><th>التكلفة</th><th></th></tr></thead><tbody>
+    ${recent.map(l=>{const st=f.stocks.find(s=>s.id==l.feedId);return `<tr><td class="money">${esc(l.date)}</td><td class="money">${esc(l.time||'—')}</td><td>${esc(l.species)}</td><td>${esc(st?.name||'—')}</td><td class="money">${fmt(l.qty)} كغ</td><td class="money">${fmt(Math.round(l.cost))} د.م</td><td><button class="btn sm danger" data-act="del-feedlog" data-id="${l.id}">✕</button></td></tr>`;}).join('')}
+  </tbody></table></div></div>`:''}
+  <div class="card"><h3><span class="hico">💡</span> قواعد التغذية</h3>${FEED_TIPS.map(t=>`<div class="note" style="margin:7px 0">${t}</div>`).join('')}</div>`;
+}
+
+/* ---------- صفحة الصحة والأدوية ---------- */
+function pageHealth(){
+  const h=state.health, sp={sheep:'أغنام',chickens:'دجاج',rabbits:'أرانب',all:'عام'};
+  const treated=(name)=>[...h.treatments].reverse().find(t=>t.drug===name)?.date||'';
+  return `
+  ${hero('الصحة والأدوية','العلاجات، التطعيمات، مواعيد السحب، والتنبيهات — سجّل كل جرعة قبل أن تنساها.','💝 الوقاية أرخص من العلاج','assets/photos/sheep-barn.jpg')}
+  ${reminderCard()}
+  <div class="grid g2">
+    <div class="card">
+      <h3><span class="hico">💉</span> تسجيل علاج / جرعة</h3>
+      <form data-form="treat">
+        <div class="row">
+          <label class="fld">التاريخ<input class="inp" name="date" type="date" value="${today()}" required></label>
+          <label class="fld">الحيوان / الرقم<input class="inp" name="animal" placeholder="مثلاً: O03 أو الخروف 2" required></label>
+          <label class="fld">الصنف<select class="inp" name="species"><option value="sheep">أغنام</option><option value="chickens">دجاج</option><option value="rabbits">أرانب</option><option value="all">عام</option></select></label>
+        </div>
+        <div class="row">
+          <label class="fld">الدواء / التطعيم<input class="inp" name="drug" placeholder="مثلاً: كلوستريديم" required></label>
+          <label class="fld">الجرعة<input class="inp" name="dose" placeholder="مثلاً: 2 مل"></label>
+          <label class="fld">السبب<input class="inp" name="reason" placeholder="وقاية / مرض / ديدان"></label>
+        </div>
+        <div class="row">
+          <label class="fld">الطبيب / المورد<input class="inp" name="vet" placeholder="اختياري"></label>
+          <label class="fld">مدة السحب (يوم)<input class="inp" name="withdrawalDays" type="number" min="0" value="0"></label>
+          <label class="fld">ملاحظة<input class="inp" name="notes" placeholder="اختياري"></label>
+        </div>
+        <button class="btn" type="submit" style="margin-top:6px">💾 حفظ الجرعة</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3><span class="hico">🗓️</span> خطة الوقاية</h3>
+      <div class="table-wrap"><table><thead><tr><th>البند</th><th>كل (يوم)</th><th>آخر جرعة</th><th>الموعد القادم</th><th></th></tr></thead><tbody>
+        ${h.plans.map(p=>{const last=treated(p.name);const next=p.due||(last?addDays(last,p.everyDays):'');return `<tr><td><b>${esc(p.name)}</b><br><small style="color:#98a29a">${sp[p.species]||''}</small></td><td class="money">${fmt(p.everyDays)}</td><td class="money">${esc(last||'—')}</td><td>${next?duePill(dayDiff(today(),next))+'<br><small class="money">'+next+'</small>':'—'}</td><td><button class="btn sm" data-act="dose" data-id="${p.id}">✔ جرعة</button> <button class="btn sm danger" data-act="del-healthplan" data-id="${p.id}">✕</button></td></tr>`;}).join('')}
+      </tbody></table></div>
+      <form data-form="healthplan" class="row" style="margin-top:14px">
+        <label class="fld">اسم البند<input class="inp" name="name" placeholder="مثلاً: جدري الأغنام" required></label>
+        <label class="fld">الصنف<select class="inp" name="species"><option value="sheep">أغنام</option><option value="chickens">دجاج</option><option value="rabbits">أرانب</option></select></label>
+        <label class="fld">يتكرر كل (يوم)<input class="inp" name="everyDays" type="number" min="1" value="90"></label>
+        <label class="fld">الموعد القادم<input class="inp" name="due" type="date"></label>
+        <button class="btn" type="submit">＋ إضافة</button>
+      </form>
+    </div>
+  </div>
+  <div class="card">
+    <h3><span class="hico">📒</span> سجل العلاجات <span class="pill v">${h.treatments.length}</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الحيوان</th><th>الدواء</th><th>الجرعة</th><th>السبب</th><th>سحب حتى</th><th></th></tr></thead><tbody>
+      ${h.treatments.length? [...h.treatments].reverse().map(t=>`<tr><td class="money">${esc(t.date)}</td><td>${esc(t.animal)}</td><td><b>${esc(t.drug)}</b></td><td>${esc(t.dose||'—')}</td><td>${esc(t.reason||'—')}</td><td class="money">${Number(t.withdrawalDays)>0?addDays(t.date,t.withdrawalDays):'—'}</td><td><button class="btn sm danger" data-act="del-treat" data-id="${t.id}">✕</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">لا توجد علاجات مسجّلة.</td></tr>'}
+    </tbody></table></div>
+  </div>
+  <div class="card"><h3><span class="hico">💡</span> قواعد الصحة</h3>${HEALTH_TIPS.map(t=>`<div class="note" style="margin:7px 0">${t}</div>`).join('')}</div>`;
+}
+
+/* ---------- صفحة الحمل والصغار ---------- */
+function pageBreeding(){
+  const b=state.breeding, sp={M:'ذكر',F:'أنثى'};
+  const fattening=b.lambs.filter(l=>l.fattenStart&&!l.saleDate);
+  const ready=b.lambs.filter(l=>Number(l.currentKg)>=35&&!l.saleDate);
+  const gains=fattening.map(l=>{const d=dayDiff(l.fattenStart,today());return d>0?(Number(l.currentKg||0)-Number(l.startKg||0))/d:0;}).filter(x=>isFinite(x)&&x>0);
+  const avgGain=gains.length?gains.reduce((a,x)=>a+x,0)/gains.length:0;
+  return `
+  ${hero('الحمل والصغار','نعجات حوامل، تواريخ ولادة محسوبة، خرفان بأوزانها، وتسمين حتى البيع.','🐣 من السّقف إلى السوق','assets/photos/sheep-barn.jpg')}
+  <div class="grid g4" style="margin-bottom:18px">
+    <div class="stat green"><div class="lab">نعجات مسجّلة</div><div class="val">${fmt(b.ewes.length)}</div><div class="sub">من ${fmt(state.counts.ewes)} في القطيع</div></div>
+    <div class="stat amber"><div class="lab">ولادات قريبة</div><div class="val">${fmt(b.ewes.filter(e=>e.matingDate&&!e.lambDate&&dayDiff(today(),addDays(e.matingDate,150))<=45).length)}</div><div class="sub">خلال 45 يوماً</div></div>
+    <div class="stat blue"><div class="lab">خرفان مسجّلة</div><div class="val">${fmt(b.lambs.length)}</div><div class="sub">منها ${fmt(fattening.length)} في التسمين</div></div>
+    <div class="stat green"><div class="lab">جاهز للبيع</div><div class="val">${fmt(ready.length)}</div><div class="sub">وزن ≥ 35 كغ</div></div>
+  </div>
+  ${reminderCard()}
+  <div class="card">
+    <h3><span class="hico">🐑</span> النعجات والحمل</h3>
+    <div class="table-wrap"><table><thead><tr><th>رقم النعجة</th><th>السّقف</th><th>الولادة المتوقعة</th><th>متبقي</th><th>الولادة الفعلية</th><th>عدد الخرفان</th><th></th></tr></thead><tbody>
+      ${b.ewes.length? b.ewes.map(e=>{const exp=addDays(e.matingDate,150);const days=e.lambDate?null:dayDiff(today(),exp);return `<tr><td><b>${esc(e.num)}</b></td><td class="money">${esc(e.matingDate||'—')}</td><td class="money">${esc(exp)}</td><td>${e.lambDate?'<span class="pill g">ولّدت</span>':duePill(days)}</td><td class="money">${esc(e.lambDate||'—')}</td><td class="money">${fmt(e.lambCount||0)}</td><td><button class="btn sm danger" data-act="del-ewe" data-id="${e.id}">✕</button></td></tr>`;}).join(''):'<tr><td colspan="7" class="empty">أضف أول نعجة بسجّل تاريخ السّقف.</td></tr>'}
+    </tbody></table></div>
+    <form data-form="ewe" class="row" style="margin-top:14px">
+      <label class="fld">رقم النعجة<input class="inp" name="num" placeholder="مثلاً: O01" required></label>
+      <label class="fld">تاريخ السّقف<input class="inp" name="matingDate" type="date" value="${today()}" required></label>
+      <label class="fld">الولادة الفعلية (إن حدثت)<input class="inp" name="lambDate" type="date"></label>
+      <label class="fld">عدد الخرفان<input class="inp" name="lambCount" type="number" min="0" value="0"></label>
+      <button class="btn" type="submit">＋ إضافة</button>
+    </form>
+    <div class="note">الولادة المتوقعة = تاريخ السّقف + 150 يوماً. إذا أدخلت تاريخ الولادة وعدد الخرفان، تُنشأ بطاقات الخرفان تلقائياً.</div>
+  </div>
+  <div class="card">
+    <h3><span class="hico">🐣</span> الخرفان — الأوزان والتسمين</h3>
+    <div class="table-wrap"><table><thead><tr><th>الرقم</th><th>الأم</th><th>الولادة</th><th>العمر</th><th>الجنس</th><th>وزن الولادة</th><th>الوزن الحالي</th><th>المرحلة</th><th>البيع المتوقع</th><th></th></tr></thead><tbody>
+      ${b.lambs.length? b.lambs.map(l=>{
+        const age=ageDays(l.birthDate), target=Number(l.targetKg||40), cur=Number(l.currentKg||0);
+        const gain=age>0?(cur-Number(l.birthKg||0))/age:0;
+        const remain=target>cur&&gain>0?Math.round((target-cur)/gain):0;
+        const sale=l.saleDate||(remain?addDays(today(),remain):'—');
+        const phase=l.saleDate?'<span class="pill g">بيع</span>':cur>=35?'<span class="pill g">جاهز</span>':l.fattenStart?'<span class="pill b">تسمين</span>':(age||0)>=90?'<span class="pill a">فطام</span>':'<span class="pill a">رضاعة</span>';
+        return `<tr><td><b>${esc(l.id)}</b></td><td>${esc(l.eweNum||'—')}</td><td class="money">${esc(l.birthDate)}</td><td class="money">${fmt(age)} ي</td><td>${sp[l.sex]||'—'}</td><td class="money">${fmt(l.birthKg)}</td><td class="money"><b>${fmt(cur)}</b> كغ</td><td>${phase}</td><td class="money">${esc(sale)}</td><td><button class="btn sm danger" data-act="del-lamb" data-id="${l.id}">✕</button></td></tr>`;
+      }).join(''):'<tr><td colspan="10" class="empty">لا توجد خرفان مسجّلة بعد.</td></tr>'}
+    </tbody></table></div>
+    <div class="row" style="margin-top:14px">
+      <form data-form="lamb" style="flex:2">
+        <div class="row">
+          <label class="fld">رقم الخروف<input class="inp" name="id" placeholder="مثلاً: L01" required></label>
+          <label class="fld">الأم<select class="inp" name="eweNum"><option value="">—</option>${b.ewes.map(e=>`<option value="${esc(e.num)}">${esc(e.num)}</option>`).join('')}</select></label>
+          <label class="fld">تاريخ الولادة<input class="inp" name="birthDate" type="date" value="${today()}" required></label>
+          <label class="fld">الجنس<select class="inp" name="sex"><option value="F">أنثى</option><option value="M">ذكر</option></select></label>
+        </div>
+        <div class="row">
+          <label class="fld">وزن الولادة (كغ)<input class="inp" name="birthKg" type="number" min="0" step="any" value="4"></label>
+          <label class="fld">الوزن الحالي (كغ)<input class="inp" name="currentKg" type="number" min="0" step="any" value="4"></label>
+          <label class="fld">بدء التسمين<input class="inp" name="fattenStart" type="date"></label>
+          <label class="fld">الوزن المستهدف<input class="inp" name="targetKg" type="number" min="0" value="40"></label>
+        </div>
+        <button class="btn" type="submit" style="margin-top:6px">＋ إضافة خروف</button>
+      </form>
+      <form data-form="weight" style="flex:1">
+        <h4 style="margin:0 0 8px">تحديث وزن</h4>
+        <label class="fld">الخروف<select class="inp" name="lambId" required>${b.lambs.map(l=>`<option value="${esc(l.id)}">${esc(l.id)}</option>`).join('')}</select></label>
+        <label class="fld">الوزن الجديد (كغ)<input class="inp" name="kg" type="number" min="0" step="any" required></label>
+        <label class="fld">تاريخ البيع (اختياري)<input class="inp" name="saleDate" type="date"></label>
+        <button class="btn ghost" type="submit" style="margin-top:6px">↻ تحديث</button>
+      </form>
+    </div>
+  </div>
+  <div class="card">
+    <h3><span class="hico">📈</span> لوحة التسمين</h3>
+    <div class="grid g3">
+      <div class="stat blue"><div class="lab">متوسط الزيادة اليومية</div><div class="val">${fmt(avgGain*1000)} غ</div><div class="sub">${fmt(avgGain.toFixed(3))} كغ/يوم</div></div>
+      <div class="stat amber"><div class="lab">خرفان قيد التسمين</div><div class="val">${fmt(fattening.length)}</div><div class="sub">الهدف 35–45 كغ</div></div>
+      <div class="stat green"><div class="lab">إيراد متوقع عند البيع</div><div class="val money">${fmt(Math.round(b.lambs.filter(l=>!l.saleDate).reduce((a,l)=>a+Math.max(0,Number(l.currentKg||0))*state.prices.lambKg,0)))}</div><div class="sub">بالوزن الحالي وسعر اليوم</div></div>
+    </div>
+  </div>
+  <div class="card"><h3><span class="hico">💡</span> قواعد الحمل والصغار</h3>${BREEDING_TIPS.map(t=>`<div class="note" style="margin:7px 0">${t}</div>`).join('')}</div>`;
+}
+
+/* ---------- صفحة الروتين اليومي ---------- */
+function pageRoutine(){
+  const done=state.routineDone[today()]||[];
+  const daily=state.feed.schedule;
+  return `
+  ${hero('الروتين اليومي','مناديل صغيرة كل يوم تصنع مزرعة كبيرة: أوقات، مهام، وتذكيرات تلقائية.','⏰ الانضباط هو نصف الإنتاج','assets/photos/sheep-barn-outdoor.jpg')}
+  <div class="grid g2">
+    <div class="card">
+      <h3><span class="hico">✅</span> قائمة اليوم — ${today()}</h3>
+      ${daily.length? daily.map(s=>`<div class="task ${done.includes(s.id)?'done':''}"><input type="checkbox" data-act="toggle-routine" data-id="${s.id}" ${done.includes(s.id)?'checked':''}><label><b class="money">${esc(s.time)}</b> — ${esc(s.task)} <small style="color:#8a958c">(${({sheep:'أغنام',chickens:'دجاج',rabbits:'أرانب',all:'عام'})[s.species]||s.species})</small></label></div>`).join(''):'<div class="empty">لا يوجد روتين مسجّل.</div>'}
+      <div class="note">تُحفظ القائمة حسب التاريخ — غداً تبدأ من جديد.</div>
+    </div>
+    <div class="card">
+      <h3><span class="hico">📅</span> مهام دورية</h3>
+      <div class="table-wrap"><table><thead><tr><th>التكرار</th><th>المهمة</th></tr></thead><tbody>
+        ${ROUTINE_WEEKLY.map(w=>`<tr><td><span class="pill b">${w[0]}</span></td><td>${w[1]}</td></tr>`).join('')}
+      </tbody></table></div>
+      <h3 style="margin-top:18px"><span class="hico">⏰</span> إضافة وقت/مهمة</h3>
+      <form data-form="feedplan" class="row">
+        <label class="fld">الوقت<input class="inp" name="time" type="time" value="09:00" required></label>
+        <label class="fld">الصنف<select class="inp" name="species"><option value="sheep">أغنام</option><option value="chickens">دجاج</option><option value="rabbits">أرانب</option><option value="all">عام</option></select></label>
+        <label class="fld">المهمة<input class="inp" name="task" required></label>
+        <label class="fld">الكمية<input class="inp" name="qty" placeholder="اختياري"></label>
+        <button class="btn" type="submit">＋ إضافة</button>
+      </form>
+    </div>
+  </div>
+  ${reminderCard()}
+  <div class="card"><h3><span class="hico">💡</span> لماذا الروتين مهم؟</h3>
+    <div class="note">الأغنام والدجاج تكره المفاجآت: تغيير وقت الأكل أو تأخير الماء يخفض الإنتاج ويرفع الإجهاد.</div>
+    <div class="note">10 دقائق صباحاً و10 مساءً تكفي لاكتشاف مريض قبل أن يصبح وباءً في القطيع.</div>
+  </div>`;
+}
+
 /* ---------- تصدير Excel حقيقي (.xlsx) بدون مكتبات خارجية ---------- */
 const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
 function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
@@ -540,7 +844,7 @@ function makeXlsx(rows){
 }
 
 /* ---------- التوجيه ---------- */
-const RENDERERS={dashboard:pageDashboard,sheep:pageSheep,chickens:pageChickens,rabbits:pageRabbits,costs:pageCosts,simulator:pageSimulator,tracking:pageTracking,plan:pagePlan};
+const RENDERERS={dashboard:pageDashboard,sheep:pageSheep,chickens:pageChickens,rabbits:pageRabbits,costs:pageCosts,simulator:pageSimulator,tracking:pageTracking,feed:pageFeed,health:pageHealth,breeding:pageBreeding,routine:pageRoutine,plan:pagePlan};
 function render(){
   active=(location.hash||'#dashboard').slice(1);
   if(!RENDERERS[active]) active='dashboard';
@@ -563,6 +867,11 @@ document.addEventListener('change',e=>{
   if(t.dataset.bind){ setPath(state,t.dataset.bind, t.type==='number'? Number(t.value) : t.value); save(); render(); }
   if(t.dataset.sim){ sim[t.dataset.sim]=Number(t.value); updateSim(); }
   if(t.dataset.act==='toggle-task'){ const x=state.tasks.find(x=>x.id==t.dataset.id); if(x){x.done=t.checked; save(); render();} }
+  if(t.dataset.act==='toggle-routine'){
+    const d=today(); const cur=state.routineDone[d]||[];
+    state.routineDone[d]=t.checked?[...cur,Number(t.dataset.id)]:cur.filter(x=>x!=t.dataset.id);
+    save(); render();
+  }
 });
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]'); if(!b) return;
@@ -584,6 +893,26 @@ document.addEventListener('click',e=>{
   if(a==='reset-prices'){ if(confirm('استعادة كل الأسعار والإنشاءات الافتراضية؟')){ state.prices=clone(DEFAULTS.prices); state.infra=clone(DEFAULTS.infra); save(); render(); } }
   if(a==='del-task'){ state.tasks=state.tasks.filter(x=>x.id!=b.dataset.id); save(); render(); }
   if(a==='del-log'){ state.logs=state.logs.filter(x=>x.id!=b.dataset.id); save(); render(); }
+  const drops={
+    'del-feed':()=>state.feed.stocks=state.feed.stocks.filter(x=>x.id!=b.dataset.id),
+    'del-feedlog':()=>state.feed.logs=state.feed.logs.filter(x=>x.id!=b.dataset.id),
+    'del-feedplan':()=>state.feed.schedule=state.feed.schedule.filter(x=>x.id!=b.dataset.id),
+    'del-treat':()=>state.health.treatments=state.health.treatments.filter(x=>x.id!=b.dataset.id),
+    'del-healthplan':()=>state.health.plans=state.health.plans.filter(x=>x.id!=b.dataset.id),
+    'del-ewe':()=>state.breeding.ewes=state.breeding.ewes.filter(x=>x.id!=b.dataset.id),
+    'del-lamb':()=>state.breeding.lambs=state.breeding.lambs.filter(x=>x.id!=b.dataset.id),
+    'del-egg':()=>state.eggs=state.eggs.filter(x=>x.id!=b.dataset.id),
+  };
+  if(drops[a]){ drops[a](); save(); render(); return; }
+  if(a==='dose'){
+    const p=state.health.plans.find(x=>x.id==b.dataset.id);
+    if(p){
+      const d=today();
+      p.due=addDays(d,p.everyDays);
+      state.health.treatments.push({id:Date.now()+Math.floor(Math.random()*1000),date:d,animal:'القطيع',species:p.species,drug:p.name,dose:'',reason:'وقاية',vet:'',withdrawalDays:0,notes:''});
+      save(); render();
+    }
+  }
   if(a==='export'){
     const head=['التاريخ','الصنف','الحيوان','الحدث','مصروف (د.م)','إيراد (د.م)','ملاحظة'];
     const sp={sheep:'أغنام',chickens:'دجاج',rabbits:'أرانب',all:'عام'};
@@ -611,6 +940,59 @@ document.addEventListener('submit',e=>{
       animal:fd.get('animal')||'', event:String(fd.get('event')||'').trim(),
       cost:Number(fd.get('cost')||0), revenue:Number(fd.get('revenue')||0), notes:fd.get('notes')||''
     });
+    save(); render();
+  }
+  if(f.dataset.form==='feed'){
+    const fd=new FormData(f);
+    state.feed.stocks.push({id:Date.now(),name:String(fd.get('name')||'').trim(),price:Number(fd.get('price')||0),qty:Number(fd.get('qty')||0)});
+    save(); render();
+  }
+  if(f.dataset.form==='feedlog'){
+    const fd=new FormData(f), fid=Number(fd.get('feedId')), q=Number(fd.get('qty')||0);
+    const st=state.feed.stocks.find(s=>s.id===fid);
+    if(st) st.qty=Math.max(0,Number(st.qty||0)-q);
+    state.feed.logs.push({id:Date.now(),date:fd.get('date')||today(),time:fd.get('time')||'',species:fd.get('species')||'all',feedId:fid,qty:q,cost:q*Number(st?.price||0),notes:fd.get('notes')||''});
+    save(); render();
+  }
+  if(f.dataset.form==='feedplan'){
+    const fd=new FormData(f);
+    state.feed.schedule.push({id:Date.now(),time:fd.get('time')||'08:00',species:fd.get('species')||'all',task:String(fd.get('task')||'').trim(),qty:fd.get('qty')||''});
+    save(); render();
+  }
+  if(f.dataset.form==='treat'){
+    const fd=new FormData(f);
+    state.health.treatments.push({id:Date.now(),date:fd.get('date')||today(),animal:String(fd.get('animal')||'').trim(),species:fd.get('species')||'all',drug:String(fd.get('drug')||'').trim(),dose:fd.get('dose')||'',reason:fd.get('reason')||'',vet:fd.get('vet')||'',withdrawalDays:Number(fd.get('withdrawalDays')||0),notes:fd.get('notes')||''});
+    save(); render();
+  }
+  if(f.dataset.form==='healthplan'){
+    const fd=new FormData(f);
+    state.health.plans.push({id:Date.now(),name:String(fd.get('name')||'').trim(),species:fd.get('species')||'sheep',everyDays:Number(fd.get('everyDays')||90),due:fd.get('due')||''});
+    save(); render();
+  }
+  if(f.dataset.form==='ewe'){
+    const fd=new FormData(f), num=String(fd.get('num')||'').trim(), ld=fd.get('lambDate')||'', n=Number(fd.get('lambCount')||0);
+    state.breeding.ewes.push({id:Date.now(),num,matingDate:fd.get('matingDate')||today(),lambDate:ld,lambCount:n});
+    if(ld&&n>0){
+      const startN=state.breeding.lambs.length;
+      for(let i=1;i<=n;i++){
+        state.breeding.lambs.push({id:'L'+String(startN+i).padStart(2,'0'),eweNum:num,birthDate:ld,sex:i%2?'F':'M',birthKg:4,currentKg:4,fattenStart:'',targetKg:40,saleDate:''});
+      }
+    }
+    save(); render();
+  }
+  if(f.dataset.form==='lamb'){
+    const fd=new FormData(f);
+    state.breeding.lambs.push({id:String(fd.get('id')||'').trim(),eweNum:fd.get('eweNum')||'',birthDate:fd.get('birthDate')||today(),sex:fd.get('sex')||'F',birthKg:Number(fd.get('birthKg')||0),currentKg:Number(fd.get('currentKg')||0),fattenStart:fd.get('fattenStart')||'',targetKg:Number(fd.get('targetKg')||40),saleDate:''});
+    save(); render();
+  }
+  if(f.dataset.form==='weight'){
+    const fd=new FormData(f), l=state.breeding.lambs.find(x=>x.id===fd.get('lambId'));
+    if(l){ l.currentKg=Number(fd.get('kg')||0); if(fd.get('saleDate')) l.saleDate=fd.get('saleDate'); }
+    save(); render();
+  }
+  if(f.dataset.form==='egg'){
+    const fd=new FormData(f);
+    state.eggs.push({id:Date.now(),date:fd.get('date')||today(),count:Number(fd.get('count')||0),broken:Number(fd.get('broken')||0),notes:fd.get('notes')||''});
     save(); render();
   }
 });

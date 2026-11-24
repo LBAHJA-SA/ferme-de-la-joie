@@ -455,7 +455,7 @@ function pageTracking(){
       ${state.logs.length? [...state.logs].reverse().map(l=>`<tr><td class="money">${esc(l.date)}</td><td>${({sheep:'🐑 أغنام',chickens:'🐔 دجاج',rabbits:'🐇 أرانب',all:'⚙️ عام'})[l.species]||l.species}</td><td><b>${esc(l.event)}</b></td><td>${esc(l.animal||'—')}</td><td class="money">${fmt(l.cost)}</td><td class="money">${fmt(l.revenue)}</td><td>${esc(l.notes||'—')}</td><td><button class="btn sm danger" data-act="del-log" data-id="${l.id}">✕</button></td></tr>`).join(''):'<tr><td colspan="8" class="empty">لا توجد أحداث مسجّلة بعد.</td></tr>'}
     </tbody></table></div>
     <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn ghost sm" data-act="export">⬇ تصدير السجل CSV</button>
+      <button class="btn ghost sm" data-act="export">⬇ تصدير السجل Excel (.xlsx)</button>
       <button class="btn ghost sm" data-act="print">🖨️ طباعة</button>
     </div>
   </div>`;
@@ -489,6 +489,54 @@ function pagePlan(){
     ['assets/photos/sheep-barn.jpg','حظيرة أغنام بأقفاص معدنية وفراش قش'],
     ['assets/photos/sheep-barn-outdoor.jpg','حظيرة مع فناء ومعلف جماعي']
   ])}`;
+}
+
+/* ---------- تصدير Excel حقيقي (.xlsx) بدون مكتبات خارجية ---------- */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+const XENC=new TextEncoder();
+function xesc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');}
+function xcol(n){let s='';n++;while(n>0){s=String.fromCharCode(65+((n-1)%26))+s;n=Math.floor((n-1)/26);}return s;}
+function sheetXML(rows){
+  const cols=Math.max(...rows.map(r=>r.length),1);
+  const body=rows.map((row,ri)=>`<row r="${ri+1}">`+row.map((v,ci)=>{
+    const ref=xcol(ci)+(ri+1);
+    if(typeof v==='number'&&isFinite(v)) return `<c r="${ref}"><v>${v}</v></c>`;
+    return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xesc(v)}</t></is></c>`;
+  }).join('')+`</row>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${xcol(cols-1)}${rows.length}"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetData>${body}</sheetData></worksheet>`;
+}
+function makeXlsx(rows){
+  const files=[
+    ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'],
+    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Suivi" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'],
+    ['xl/worksheets/sheet1.xml',sheetXML(rows)]
+  ].map(([name,text])=>({name,data:XENC.encode(text)}));
+  const local=[],central=[]; let offset=0;
+  for(const f of files){
+    const nb=XENC.encode(f.name), crc=crc32(f.data);
+    const h=new Uint8Array(30+nb.length), dv=new DataView(h.buffer);
+    dv.setUint32(0,0x04034b50,true); dv.setUint16(4,20,true); dv.setUint16(6,0x0800,true);
+    dv.setUint16(8,0,true); dv.setUint16(10,0,true); dv.setUint16(12,0x0021,true);
+    dv.setUint32(14,crc,true); dv.setUint32(18,f.data.length,true); dv.setUint32(22,f.data.length,true);
+    dv.setUint16(26,nb.length,true); dv.setUint16(28,0,true); h.set(nb,30);
+    const c=new Uint8Array(46+nb.length), cv=new DataView(c.buffer);
+    cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+    cv.setUint16(8,0x0800,true); cv.setUint16(10,0,true); cv.setUint16(12,0,true); cv.setUint16(14,0x0021,true);
+    cv.setUint32(16,crc,true); cv.setUint32(20,f.data.length,true); cv.setUint32(24,f.data.length,true);
+    cv.setUint16(28,nb.length,true); cv.setUint16(30,0,true); cv.setUint16(32,0,true);
+    cv.setUint16(34,0,true); cv.setUint16(36,0,true); cv.setUint32(38,0,true); cv.setUint32(42,offset,true);
+    c.set(nb,46);
+    local.push(h,f.data); central.push(c); offset+=h.length+f.data.length;
+  }
+  const cdSize=central.reduce((a,c)=>a+c.length,0);
+  const e=new Uint8Array(22), ev=new DataView(e.buffer);
+  ev.setUint32(0,0x06054b50,true); ev.setUint16(4,0,true); ev.setUint16(6,0,true);
+  ev.setUint16(8,files.length,true); ev.setUint16(10,files.length,true);
+  ev.setUint32(12,cdSize,true); ev.setUint32(16,offset,true); ev.setUint16(20,0,true);
+  return new Blob([...local,...central,e],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 
 /* ---------- التوجيه ---------- */
@@ -537,10 +585,14 @@ document.addEventListener('click',e=>{
   if(a==='del-task'){ state.tasks=state.tasks.filter(x=>x.id!=b.dataset.id); save(); render(); }
   if(a==='del-log'){ state.logs=state.logs.filter(x=>x.id!=b.dataset.id); save(); render(); }
   if(a==='export'){
-    const head='date,species,animal,event,detail,cost,revenue,notes\n';
-    const rows=state.logs.map(l=>[l.date,l.species,l.animal,l.event,l.detail||'',l.cost||0,l.revenue||0,l.notes||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const url=URL.createObjectURL(new Blob(['\ufeff'+head+rows],{type:'text/csv;charset=utf-8'}));
-    const link=document.createElement('a'); link.href=url; link.download='mazraati-suivi.csv'; link.click(); URL.revokeObjectURL(url);
+    const head=['التاريخ','الصنف','الحيوان','الحدث','مصروف (د.م)','إيراد (د.م)','ملاحظة'];
+    const sp={sheep:'أغنام',chickens:'دجاج',rabbits:'أرانب',all:'عام'};
+    const rows=[head,...state.logs.map(l=>[l.date,sp[l.species]||l.species,l.animal||'',l.event,Number(l.cost||0),Number(l.revenue||0),l.notes||''])];
+    if(rows.length===1) rows.push(['—','لا توجد أحداث مسجلة بعد','','','','','']);
+    const url=URL.createObjectURL(makeXlsx(rows));
+    const link=document.createElement('a'); link.href=url; link.download='SADKI-ECURIE-suivi.xlsx';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
 });
 document.addEventListener('submit',e=>{

@@ -155,7 +155,7 @@ function pageDashboard(){
       <div class="note" style="margin-bottom:0">التقييم الحالي: <b>${e.verdict}</b> — ${e.score}/100. <a href="#simulator" style="color:inherit;font-weight:700">جرّب محاكي التوسعة ←</a></div>
     </div>
     <div class="card">
-      <img class="illus" src="assets/sheep.svg" alt="أغنام دمانية وصردي">
+      <img class="illus" src="assets/photos/sheep-barn.jpg" alt="حظيرة أغنام حقيقية بأقفاص وفراش قش">
       <h3 style="margin-top:14px">نقطة البداية</h3>
       <div class="kv"><span>النعجات</span><b>${fmt(c.ewes)} دمانية</b></div>
       <div class="kv"><span>الفحل</span><b>${fmt(c.rams)} صردي</b></div>
@@ -475,7 +475,7 @@ function pagePlan(){
       ${TIPS.map((t,i)=>`<div class="note" style="margin:8px 0"><b>${i+1}.</b> ${t}</div>`).join('')}
     </div>
     <div class="card">
-      <img class="illus" src="assets/sheep.svg" alt="">
+      <img class="illus" src="assets/photos/sheep-barn-outdoor.jpg" alt="حظيرة أغنام حقيقية مع فناء ومعلف">
       <h3 style="margin-top:14px"><span class="hico">🧭</span> القاعدة الذهبية</h3>
       <div class="note warn" style="font-size:15px"><b>لا توسّع قبل تأمين العلف والمساحة.</b><br>الربح في المشاريع الصغيرة لا يأتي من زيادة الرؤوس، بل من خفض كلفة العلف وتقليل النفوق.</div>
       <div class="kv"><span>الوضع الحالي</span><b>${fmt(state.counts.ewes)} نعجة + ${fmt(state.counts.rams)} فحل + ${fmt(state.counts.hens)} دجاجة</b></div>

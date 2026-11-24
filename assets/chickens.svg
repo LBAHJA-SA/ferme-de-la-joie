@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260">
+  <defs><linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e0"/><stop offset="1" stop-color="#f6e2bb"/></linearGradient></defs>
+  <rect width="420" height="260" rx="18" fill="url(#bg2)"/>
+  <circle cx="70" cy="48" r="26" fill="#ffe9a8"/>
+  <path d="M0 206 Q120 176 230 204 T420 196 V260 H0Z" fill="#d9b877"/>
+  <!-- nest -->
+  <ellipse cx="210" cy="228" rx="86" ry="22" fill="#a97e46"/>
+  <ellipse cx="210" cy="224" rx="72" ry="15" fill="#c99a58"/>
+  <g fill="#fffdf5" stroke="#e6dcc4"><ellipse cx="186" cy="220" rx="13" ry="16"/><ellipse cx="212" cy="222" rx="13" ry="16"/><ellipse cx="238" cy="219" rx="13" ry="16"/></g>
+  <!-- hen 1 -->
+  <g transform="translate(128 140)">
+    <ellipse cx="0" cy="0" rx="36" ry="28" fill="#d9863f"/>
+    <path d="M-30 8 q-18 14 -6 26 q14 -2 18 -18Z" fill="#b9692c"/>
+    <circle cx="30" cy="-18" r="17" fill="#e2954a"/>
+    <path d="M38 -30 q8 -12 16 -2 q-6 4 -6 10Z" fill="#c74338"/>
+    <path d="M26 -32 q-2 -12 8 -12 q-2 8 2 12Z" fill="#c74338"/>
+    <circle cx="36" cy="-20" r="2.4" fill="#2c1d12"/>
+    <path d="M46 -14 l12 4 l-12 4Z" fill="#e8a33c"/>
+    <path d="M-8 26 v12 M10 26 v12" stroke="#d9863f" stroke-width="5"/>
+  </g>
+  <!-- hen 2 -->
+  <g transform="translate(286 148) scale(0.9)">
+    <ellipse cx="0" cy="0" rx="36" ry="28" fill="#f0e3c8"/>
+    <path d="M-30 8 q-18 14 -6 26 q14 -2 18 -18Z" fill="#d8c39a"/>
+    <circle cx="30" cy="-18" r="17" fill="#f5ebd4"/>
+    <path d="M38 -30 q8 -12 16 -2 q-6 4 -6 10Z" fill="#c74338"/>
+    <circle cx="36" cy="-20" r="2.4" fill="#2c1d12"/>
+    <path d="M46 -14 l12 4 l-12 4Z" fill="#e8a33c"/>
+    <path d="M-8 26 v12 M10 26 v12" stroke="#d8c39a" stroke-width="5"/>
+  </g>
+  <text x="210" y="254" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#8a6520">30 دجاجة بيّاضة</text>
+</svg>

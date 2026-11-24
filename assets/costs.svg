@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260">
+  <defs><linearGradient id="bg4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4e2"/><stop offset="1" stop-color="#f4dcb6"/></linearGradient></defs>
+  <rect width="420" height="260" rx="18" fill="url(#bg4)"/>
+  <circle cx="90" cy="52" r="30" fill="#ffe6aa"/>
+  <!-- coin stack -->
+  <g transform="translate(120 150)">
+    <ellipse cx="0" cy="62" rx="62" ry="16" fill="#d9a13c" opacity="0.35"/>
+    <g stroke="#b8801f" stroke-width="2">
+      <ellipse cx="0" cy="56" rx="54" ry="14" fill="#f2c65b"/><rect x="-54" y="42" width="108" height="14" fill="#f2c65b"/>
+      <ellipse cx="0" cy="42" rx="54" ry="14" fill="#ffd86e"/><rect x="-54" y="28" width="108" height="14" fill="#ffd86e"/>
+      <ellipse cx="0" cy="28" rx="54" ry="14" fill="#f2c65b"/><rect x="-54" y="14" width="108" height="14" fill="#f2c65b"/>
+      <ellipse cx="0" cy="14" rx="54" ry="14" fill="#ffd86e"/>
+    </g>
+    <text x="0" y="20" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="bold" fill="#8a5e12">د.م</text>
+  </g>
+  <!-- feed sack -->
+  <g transform="translate(262 112)">
+    <path d="M8 26 q34 -18 68 0 l10 108 q-44 14 -88 0Z" fill="#caa46a" stroke="#a17e47" stroke-width="2"/>
+    <path d="M8 26 q34 14 68 0" stroke="#8d6b3d" stroke-width="3" fill="none"/>
+    <rect x="6" y="66" width="72" height="34" rx="4" fill="#f0dcae"/>
+    <text x="42" y="88" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#7a5522">علف</text>
+  </g>
+  <text x="210" y="248" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#8a6520">التكاليف حسب الصنف</text>
+</svg>

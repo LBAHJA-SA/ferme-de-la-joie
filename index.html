@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مزرعتي — الأغنام · الدجاج · الأرانب</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="dashboard">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">🐑</div>
+        <div><h1>مزرعتي</h1><small>الأغنام · الدجاج · الأرانب</small></div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="side-foot">
+        💾 كل بياناتك محفوظة في هذا المتصفح.<br>
+        <b>لا حاجة للإنترنت.</b><br>
+        انسخ مجلد <b>app</b> إلى أي جهاز وستعمل النسخة نفسها.
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb" id="crumb">التطبيق / <b>نظرة عامة</b></div>
+        <div class="actions">
+          <span class="datechip" id="datechip"></span>
+          <a class="btn sm ghost" href="#tracking">📋 سجّل اليوم</a>
+        </div>
+      </header>
+      <div id="page"></div>
+    </main>
+  </div>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
